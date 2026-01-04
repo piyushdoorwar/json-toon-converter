@@ -649,15 +649,15 @@ body::before {
     display: flex;
 }
 
-.xml-only {
+.toon-only {
     display: none;
 }
 
-.mode-xml-json .json-only {
+.mode-toon-json .json-only {
     display: none;
 }
 
-.mode-xml-json .xml-only {
+.mode-toon-json .toon-only {
     display: flex;
 }
 
