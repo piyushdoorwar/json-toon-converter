@@ -7,13 +7,14 @@ const leftTitle = document.getElementById('left-title');
 const rightTitle = document.getElementById('right-title');
 const leftStatus = document.getElementById('left-status');
 const rightStatus = document.getElementById('right-status');
-const convertBtn = document.getElementById('convert-btn');
-const convertBtnText = document.getElementById('convert-btn-text');
 const modeBtns = document.querySelectorAll('.mode-btn');
 const appContainer = document.querySelector('.app-container');
 
 // Current mode
 let currentMode = 'json-toon';
+let currentIndent = 2; // Track current indent value
+let currentDelimiter = ','; // Track current delimiter value
+let currentTokenStats = { jsonTokens: 0, toonTokens: 0, reduction: 0 }; // Track token stats
 
 // History for undo functionality
 let leftHistory = [];
@@ -53,9 +54,6 @@ function setupEventListeners() {
         }
     });
     
-    // Convert button
-    convertBtn.addEventListener('click', handleConvert);
-    
     // Action buttons
     document.querySelectorAll('.action-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -93,6 +91,7 @@ function setupEventListeners() {
         updateCharCount('left');
         updateLineNumbers('left');
         saveToHistory('left');
+        handleConvert(); // Live conversion
     });
     rightEditor.addEventListener('input', () => {
         updateCharCount('right');
@@ -107,6 +106,67 @@ function setupEventListeners() {
     // Initialize line numbers
     updateLineNumbers('left');
     updateLineNumbers('right');
+    
+    // Live conversion on option changes
+    const indentButtons = document.querySelectorAll('.indent-btn');
+    indentButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Update active state
+            indentButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            // Update current indent value
+            currentIndent = parseInt(btn.dataset.indent);
+            handleConvert();
+        });
+    });
+    
+    const delimiterButtons = document.querySelectorAll('.delimiter-btn');
+    delimiterButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Update active state
+            delimiterButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            // Update current delimiter value
+            currentDelimiter = btn.dataset.delimiter;
+            handleConvert();
+        });
+    });
+    
+    // Settings modal
+    const settingsModal = document.getElementById('settings-modal');
+    const settingsOverlay = document.getElementById('settings-overlay');
+    const settingsClose = document.getElementById('settings-close');
+    
+    if (settingsOverlay) {
+        settingsOverlay.addEventListener('click', closeSettingsModal);
+    }
+    if (settingsClose) {
+        settingsClose.addEventListener('click', closeSettingsModal);
+    }
+    
+    // Info modal
+    const infoModal = document.getElementById('info-modal');
+    const infoOverlay = document.getElementById('info-overlay');
+    const infoClose = document.getElementById('info-close');
+    
+    if (infoOverlay) {
+        infoOverlay.addEventListener('click', closeInfoModal);
+    }
+    if (infoClose) {
+        infoClose.addEventListener('click', closeInfoModal);
+    }
+    
+    // Close modal with Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            if (settingsModal && settingsModal.classList.contains('show')) {
+                closeSettingsModal();
+            }
+            if (infoModal && infoModal.classList.contains('show')) {
+                closeInfoModal();
+            }
+        }
+    });
 }
 
 // Update Mode
@@ -132,13 +192,11 @@ function updateMode() {
     if (currentMode === 'json-toon') {
         leftTitle.textContent = 'JSON Input';
         rightTitle.textContent = 'Toon Output';
-        convertBtnText.textContent = 'Convert JSON to Toon';
         leftEditor.placeholder = 'Enter your JSON here...';
         rightEditor.placeholder = 'Toon output will appear here...';
     } else {
         leftTitle.textContent = 'Toon Input';
         rightTitle.textContent = 'JSON Output';
-        convertBtnText.textContent = 'Convert Toon to JSON';
         leftEditor.placeholder = 'Enter your Toon here...';
         rightEditor.placeholder = 'JSON output will appear here...';
     }
@@ -192,6 +250,7 @@ isActive: true`;
     updateCharCount('left');
     updateLineNumbers('left');
     saveToHistory('left');
+    handleConvert(); // Live conversion after loading sample
     setTimeout(() => updateStatus('left', 'Ready', false), 2000);
 }
 
@@ -209,12 +268,20 @@ function handleAction(action) {
             break;
         case 'beautify-left':
             beautifyEditor('left');
+            handleConvert(); // Live conversion after beautify
             break;
         case 'beautify-right':
             beautifyEditor('right');
             break;
         case 'sort-keys':
             sortJsonKeys();
+            handleConvert(); // Live conversion after sorting keys
+            break;
+        case 'open-settings':
+            openSettingsModal();
+            break;
+        case 'open-info':
+            openInfoModal();
             break;
         case 'clear-left':
             leftEditor.value = '';
@@ -238,6 +305,7 @@ function handleAction(action) {
             break;
         case 'paste-left':
             pasteFromClipboard('left');
+            setTimeout(() => handleConvert(), 100); // Live conversion after paste
             break;
         case 'paste-right':
             pasteFromClipboard('right');
@@ -377,6 +445,7 @@ function changeCasing(caseType) {
         updateStatus('left', `Converted to ${caseType}`, true);
         updateCharCount('left');
         updateLineNumbers('left');
+        handleConvert(); // Live conversion after casing change
     } catch (error) {
         updateStatus('left', '✗ ' + error.message, false, true);
     }
@@ -416,14 +485,21 @@ function convertCase(str, caseType) {
 // Handle Convert
 function handleConvert() {
     const input = leftEditor.value.trim();
+    const infoBtn = document.getElementById('info-btn');
     
     if (!input) {
-        updateStatus('left', 'No input to convert', false);
+        rightEditor.value = '';
+        updateStatus('left', 'Ready', false);
+        updateStatus('right', 'Ready', false);
+        updateCharCount('right');
+        updateLineNumbers('right');
+        if (infoBtn) infoBtn.style.display = 'none';
         return;
     }
     
-    const indentSpaces = parseInt(document.getElementById('indent-spaces').value);
-    const delimiter = document.getElementById('delimiter').value.replace('\\t', '\t');
+    // Get indent and delimiter values if available, otherwise use defaults
+    const indentSpaces = currentIndent;
+    const delimiter = currentDelimiter.replace('\\t', '\t');
     
     try {
         if (currentMode === 'json-toon') {
@@ -433,8 +509,14 @@ function handleConvert() {
             updateStatus('left', '✓ Valid JSON', true);
             updateStatus('right', '✓ Converted to Toon', true);
             
-            // Calculate and display token stats
-            updateTokenStats(input, toon);
+            // Calculate and store token stats
+            const jsonTokens = countTokens(input);
+            const toonTokens = countTokens(toon);
+            const reduction = ((jsonTokens - toonTokens) / jsonTokens * 100).toFixed(1);
+            currentTokenStats = { jsonTokens, toonTokens, reduction };
+            
+            // Show info button
+            if (infoBtn) infoBtn.style.display = 'flex';
         } else {
             const obj = toonToJSON(input);
             const json = JSON.stringify(obj, null, 2);
@@ -442,14 +524,19 @@ function handleConvert() {
             updateStatus('left', '✓ Valid Toon', true);
             updateStatus('right', '✓ Converted to JSON', true);
             
-            // Calculate and display token stats
-            updateTokenStats(json, input);
+            // Hide info button in toon-json mode
+            if (infoBtn) infoBtn.style.display = 'none';
         }
         updateCharCount('right');
         updateLineNumbers('right');
     } catch (error) {
-        updateStatus('left', '✗ ' + error.message, false, true);
-        hideTokenStats();
+        // Silently fail for live conversion - don't show errors while typing
+        rightEditor.value = '';
+        updateStatus('left', 'Ready', false);
+        updateStatus('right', 'Ready', false);
+        updateCharCount('right');
+        updateLineNumbers('right');
+        if (infoBtn) infoBtn.style.display = 'none';
     }
 }
 
@@ -900,6 +987,12 @@ function undoEdit(side) {
     updateStatus(side, '✓ Undo successful', true);
     updateCharCount(side);
     updateLineNumbers(side);
+    
+    // Live conversion after undo on left editor
+    if (side === 'left') {
+        handleConvert();
+    }
+    
     setTimeout(() => updateStatus(side, 'Ready', false), 2000);
 }
 
@@ -950,6 +1043,45 @@ function updateCharCount(side) {
 function updateCharCounts() {
     updateCharCount('left');
     updateCharCount('right');
+}
+
+// Settings Modal Functions
+function openSettingsModal() {
+    const modal = document.getElementById('settings-modal');
+    if (modal) {
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeSettingsModal() {
+    const modal = document.getElementById('settings-modal');
+    if (modal) {
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+}
+
+// Info Modal Functions
+function openInfoModal() {
+    const modal = document.getElementById('info-modal');
+    if (modal) {
+        // Update modal with current stats
+        document.getElementById('modal-json-tokens').textContent = currentTokenStats.jsonTokens;
+        document.getElementById('modal-toon-tokens').textContent = currentTokenStats.toonTokens;
+        document.getElementById('modal-token-reduction').textContent = currentTokenStats.reduction + '%';
+        
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeInfoModal() {
+    const modal = document.getElementById('info-modal');
+    if (modal) {
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+    }
 }
 
 // Initialize on load
