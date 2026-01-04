@@ -184,14 +184,52 @@
             </div>
         </div>
 
-        <!-- Convert Button -->
+        <!-- Convert Footer -->
         <div class="convert-section">
-            <button class="convert-btn" id="convert-btn">
-                <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
-                    <path fill-rule="evenodd" d="M1 8a.5.5 0 01.5-.5h11.793l-3.147-3.146a.5.5 0 01.708-.708l4 4a.5.5 0 010 .708l-4 4a.5.5 0 01-.708-.708L13.293 8.5H1.5A.5.5 0 011 8z"/>
-                </svg>
-                <span id="convert-btn-text">Convert JSON to Toon</span>
-            </button>
+            <div class="convert-footer">
+                <div class="footer-block footer-options">
+                    <div class="convert-options">
+                        <div class="option-group">
+                            <label for="indent-spaces">Indent Spaces</label>
+                            <select id="indent-spaces">
+                                <option value="0">None</option>
+                                <option value="2" selected>2</option>
+                                <option value="4">4</option>
+                            </select>
+                        </div>
+                        <div class="option-group">
+                            <label for="delimiter">Delimiter</label>
+                            <select id="delimiter">
+                                <option value="," selected>Comma (,)</option>
+                                <option value="\t">Tab (\t)</option>
+                                <option value="|">Pipe (|)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="convert-btn footer-block" id="convert-btn">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                        <path fill-rule="evenodd" d="M1 8a.5.5 0 01.5-.5h11.793l-3.147-3.146a.5.5 0 01.708-.708l4 4a.5.5 0 010 .708l-4 4a.5.5 0 01-.708-.708L13.293 8.5H1.5A.5.5 0 011 8z"/>
+                    </svg>
+                    <span id="convert-btn-text">Convert JSON to Toon</span>
+                </button>
+
+                <div class="stats-inline footer-block" id="stats-section">
+                    <div class="stat-compact">
+                        <div class="stat-compact-label">JSON Tokens</div>
+                        <div class="stat-compact-value" id="json-tokens">0</div>
+                    </div>
+                    <div class="stat-compact">
+                        <div class="stat-compact-label">TOON Tokens</div>
+                        <div class="stat-compact-value" id="toon-tokens">0</div>
+                    </div>
+                    <div class="stat-compact stat-highlight">
+                        <div class="stat-compact-label">Token Reduction</div>
+                        <div class="stat-compact-value" id="token-reduction">0%</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

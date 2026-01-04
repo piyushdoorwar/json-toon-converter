@@ -173,19 +173,19 @@ function loadSample() {
 }`;
     } else {
         // Sample Toon
-        leftEditor.value = `📦 person
-  📝 name: John Doe
-  🔢 age: 30
-  📧 email: john.doe@example.com
-  📍 address
-    🏠 street: 123 Main St
-    🌆 city: New York
-    📮 zipCode: 10001
-  🎯 hobbies
-    • reading
-    • coding
-    • traveling
-  ✅ isActive: true`;
+        leftEditor.value = `person:
+name: John Doe
+age: 30
+email: john.doe@example.com
+address:
+street: 123 Main St
+city: New York
+zipCode: "10001"
+hobbies[3]:
+- reading
+- coding
+- traveling
+isActive: true`;
     }
     
     updateStatus('left', '✓ Sample loaded', true);
@@ -422,126 +422,185 @@ function handleConvert() {
         return;
     }
     
+    const indentSpaces = parseInt(document.getElementById('indent-spaces').value);
+    const delimiter = document.getElementById('delimiter').value.replace('\\t', '\t');
+    
     try {
         if (currentMode === 'json-toon') {
             const obj = JSON.parse(input);
-            const toon = jsonToToon(obj);
+            const toon = jsonToToon(obj, indentSpaces, delimiter);
             rightEditor.value = toon;
             updateStatus('left', '✓ Valid JSON', true);
             updateStatus('right', '✓ Converted to Toon', true);
+            
+            // Calculate and display token stats
+            updateTokenStats(input, toon);
         } else {
             const obj = toonToJSON(input);
-            rightEditor.value = JSON.stringify(obj, null, 2);
+            const json = JSON.stringify(obj, null, 2);
+            rightEditor.value = json;
             updateStatus('left', '✓ Valid Toon', true);
             updateStatus('right', '✓ Converted to JSON', true);
+            
+            // Calculate and display token stats
+            updateTokenStats(json, input);
         }
         updateCharCount('right');
         updateLineNumbers('right');
     } catch (error) {
         updateStatus('left', '✗ ' + error.message, false, true);
+        hideTokenStats();
     }
 }
 
-// JSON to Toon Converter
-function jsonToToon(obj, rootName = 'root') {
-    const iconMap = {
-        string: '📝',
-        number: '🔢',
-        boolean: '✅',
-        object: '📦',
-        array: '🎯',
-        null: '⚫',
-        email: '📧',
-        address: '📍',
-        street: '🏠',
-        city: '🌆',
-        zipCode: '📮',
-        phone: '📞',
-        url: '🔗',
-        date: '📅',
-        time: '⏰',
-        user: '👤',
-        person: '👤',
-        name: '📝',
-        age: '🔢',
-        id: '🔑',
-        price: '💰',
-        count: '🔢'
-    };
+// Update Token Statistics
+function updateTokenStats(jsonStr, toonStr) {
+    const jsonTokens = countTokens(jsonStr);
+    const toonTokens = countTokens(toonStr);
+    const reduction = ((jsonTokens - toonTokens) / jsonTokens * 100).toFixed(1);
     
-    function getIcon(key, value) {
-        const lowerKey = key.toLowerCase();
-        if (iconMap[lowerKey]) return iconMap[lowerKey];
-        
-        if (value === null) return iconMap.null;
-        if (typeof value === 'boolean') return iconMap.boolean;
-        if (typeof value === 'number') return iconMap.number;
-        if (Array.isArray(value)) return iconMap.array;
-        if (typeof value === 'object') return iconMap.object;
-        return iconMap.string;
+    document.getElementById('json-tokens').textContent = jsonTokens;
+    document.getElementById('toon-tokens').textContent = toonTokens;
+    document.getElementById('token-reduction').textContent = reduction + '%';
+    
+    const statsSection = document.getElementById('stats-section');
+    statsSection.classList.add('show');
+}
+
+// Hide Token Statistics
+function hideTokenStats() {
+    const statsSection = document.getElementById('stats-section');
+    statsSection.classList.remove('show');
+}
+
+// Count Tokens (simplified - counts non-whitespace sequences)
+function countTokens(str) {
+    // Remove extra whitespace and count meaningful tokens
+    return str.trim().split(/\s+/).filter(t => t.length > 0).length;
+}
+
+// JSON to Toon Converter
+function jsonToToon(obj, indentSpaces = 2, delimiter = '|') {
+    let result = '';
+    const indentStr = indentSpaces === 0 ? '' : ' '.repeat(indentSpaces);
+    
+    function needsQuotes(key) {
+        // Quote numeric keys and keys that start with numbers
+        return /^\d/.test(key);
     }
     
-    function convert(obj, key, level = 0) {
-        const indent = '  '.repeat(level);
+    function formatValue(value) {
+        if (typeof value === 'string') {
+            // Quote strings that look like numbers or zip codes
+            if (/^\d+$/.test(value)) {
+                return `"${value}"`;
+            }
+            return value;
+        }
+        return value;
+    }
+    
+    function getObjectSchema(arr) {
+        // Check if all items in array have the same keys
+        if (arr.length === 0) return null;
+        if (typeof arr[0] !== 'object' || arr[0] === null || Array.isArray(arr[0])) return null;
+        
+        const firstKeys = Object.keys(arr[0]).sort();
+        const allSame = arr.every(item => {
+            if (typeof item !== 'object' || item === null || Array.isArray(item)) return false;
+            const keys = Object.keys(item).sort();
+            return JSON.stringify(keys) === JSON.stringify(firstKeys);
+        });
+        
+        return allSame ? firstKeys : null;
+    }
+    
+    function convert(obj, key = '', level = 0) {
+        const indent = indentStr.repeat(level);
         
         if (obj === null) {
-            return `${indent}${getIcon(key, obj)} ${key}: null\n`;
+            const keyStr = needsQuotes(key) ? `"${key}"` : key;
+            result += `${indent}${keyStr}: null\n`;
+            return;
         }
         
-        if (typeof obj === 'boolean') {
-            return `${indent}${getIcon(key, obj)} ${key}: ${obj}\n`;
-        }
-        
-        if (typeof obj === 'number') {
-            return `${indent}${getIcon(key, obj)} ${key}: ${obj}\n`;
-        }
-        
-        if (typeof obj === 'string') {
-            return `${indent}${getIcon(key, obj)} ${key}: ${obj}\n`;
+        if (typeof obj === 'boolean' || typeof obj === 'number' || typeof obj === 'string') {
+            const keyStr = needsQuotes(key) ? `"${key}"` : key;
+            const value = formatValue(obj);
+            result += `${indent}${keyStr}: ${value}\n`;
+            return;
         }
         
         if (Array.isArray(obj)) {
-            let result = `${indent}${getIcon(key, obj)} ${key}\n`;
-            obj.forEach((item, index) => {
-                if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
-                    result += convert(item, `item${index}`, level + 1);
-                } else if (Array.isArray(item)) {
-                    result += convert(item, `subarray${index}`, level + 1);
-                } else {
-                    result += `${indent}  • ${item}\n`;
-                }
-            });
-            return result;
+            const schema = getObjectSchema(obj);
+            
+            if (schema) {
+                // Array of objects with same schema - use compact format
+                result += `${indent}${key}[${obj.length}]{${schema.join(delimiter)}}:\n`;
+                obj.forEach(item => {
+                    const values = schema.map(k => formatValue(item[k]));
+                    result += `${indent}${indentStr}${values.join(delimiter)}\n`;
+                });
+            } else {
+                // Regular array or mixed array
+                result += `${indent}${key}[${obj.length}]:\n`;
+                obj.forEach(item => {
+                    if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
+                        result += `${indent}${indentStr}- `;
+                        const beforeDash = result.length;
+                        for (let k in item) {
+                            convert(item[k], k, level + 1);
+                        }
+                    } else if (Array.isArray(item)) {
+                        result += `${indent}${indentStr}- `;
+                        convert(item, 'item', level + 1);
+                    } else {
+                        result += `${indent}${indentStr}- ${formatValue(item)}\n`;
+                    }
+                });
+            }
+            return;
         }
         
         if (typeof obj === 'object') {
-            let result = `${indent}${getIcon(key, obj)} ${key}\n`;
-            for (let k in obj) {
-                result += convert(obj[k], k, level + 1);
+            if (key) {
+                result += `${indent}${key}:\n`;
             }
-            return result;
+            for (let k in obj) {
+                convert(obj[k], k, level + (key ? 1 : 0));
+            }
+            return;
         }
-        
-        return `${indent}${key}: ${obj}\n`;
     }
     
-    return convert(obj, rootName, 0).trim();
+    // Get the root key or use the first key
+    const keys = Object.keys(obj);
+    if (keys.length === 1) {
+        convert(obj[keys[0]], keys[0], 0);
+    } else {
+        for (let key of keys) {
+            convert(obj[key], key, 0);
+        }
+    }
+    
+    return result.trim();
 }
 
 // Toon to JSON Converter
 function toonToJSON(toonString) {
-    const lines = toonString.split('\n').map(line => line.trimEnd());
-    
-    function getIndentLevel(line) {
-        const match = line.match(/^(\s*)/);
-        return match ? Math.floor(match[1].length / 2) : 0;
-    }
-    
-    function removeBullet(line) {
-        return line.replace(/^\s*•\s*/, '');
-    }
+    const lines = toonString.split('\n').filter(line => line.trim());
+    let result = {};
+    let i = 0;
     
     function parseValue(value) {
+        value = value.trim();
+        
+        // Handle quoted strings
+        if ((value.startsWith('"') && value.endsWith('"')) || 
+            (value.startsWith("'") && value.endsWith("'"))) {
+            return value.slice(1, -1);
+        }
+        
         if (value === 'true') return true;
         if (value === 'false') return false;
         if (value === 'null') return null;
@@ -551,139 +610,147 @@ function toonToJSON(toonString) {
     }
     
     function parseLine(line) {
-        // Remove emoji icons
-        line = line.replace(/^(\s*)[📝🔢✅📦🎯⚫📧📍🏠🌆📮📞🔗📅⏰👤🔑💰]\s*/, '$1');
+        line = line.trim();
         
-        const trimmed = line.trim();
-        
-        // Check if it's a bullet point
-        if (trimmed.startsWith('•')) {
-            return {
-                type: 'bullet',
-                value: removeBullet(trimmed).trim()
-            };
+        // Check for array with schema: key[count]{field1|field2}:
+        const schemaMatch = line.match(/^("?[^"\[]+"?)\[(\d+)\]\{([^}]+)\}:$/);
+        if (schemaMatch) {
+            const key = schemaMatch[1].replace(/^"|"$/g, '');
+            const count = parseInt(schemaMatch[2]);
+            const fields = schemaMatch[3].split('|');
+            return { type: 'array-schema', key, count, fields };
         }
         
-        // Check if it has a colon (key-value pair)
-        if (trimmed.includes(':')) {
-            const colonIndex = trimmed.indexOf(':');
-            const key = trimmed.substring(0, colonIndex).trim();
-            const value = trimmed.substring(colonIndex + 1).trim();
-            
-            if (value) {
-                return {
-                    type: 'keyvalue',
-                    key: key,
-                    value: parseValue(value)
-                };
-            } else {
-                return {
-                    type: 'object',
-                    key: key
-                };
+        // Check for array: key[count]:
+        const arrayMatch = line.match(/^("?[^"\[]+"?)\[(\d+)\]:$/);
+        if (arrayMatch) {
+            const key = arrayMatch[1].replace(/^"|"$/g, '');
+            const count = parseInt(arrayMatch[2]);
+            return { type: 'array', key, count };
+        }
+        
+        // Check for object: key:
+        if (line.endsWith(':')) {
+            const key = line.slice(0, -1).replace(/^"|"$/g, '');
+            return { type: 'object', key };
+        }
+        
+        // Check for array item: - value or - key: value
+        if (line.startsWith('- ')) {
+            const content = line.substring(2).trim();
+            if (content.includes(':')) {
+                const colonIndex = content.indexOf(':');
+                const key = content.substring(0, colonIndex).trim().replace(/^"|"$/g, '');
+                const value = content.substring(colonIndex + 1).trim();
+                return { type: 'array-item-kv', key, value };
             }
+            return { type: 'array-item', value: content };
         }
         
-        // Just a key (object or array marker)
-        return {
-            type: 'object',
-            key: trimmed
-        };
+        // Key-value pair: key: value
+        if (line.includes(':')) {
+            const colonIndex = line.indexOf(':');
+            const key = line.substring(0, colonIndex).trim().replace(/^"|"$/g, '');
+            const value = line.substring(colonIndex + 1).trim();
+            return { type: 'keyvalue', key, value };
+        }
+        
+        return { type: 'unknown', line };
     }
     
-    function buildObject(lines, startIndex = 0, parentIndent = -1) {
-        if (startIndex >= lines.length) {
-            return { obj: {}, nextIndex: startIndex };
-        }
+    function buildStructure() {
+        const root = {};
         
-        const currentLine = lines[startIndex];
-        const currentIndent = getIndentLevel(currentLine);
-        
-        if (currentIndent <= parentIndent) {
-            return { obj: {}, nextIndex: startIndex };
-        }
-        
-        const parsed = parseLine(currentLine);
-        
-        if (parsed.type === 'keyvalue') {
-            // Simple key-value, no children expected at this level
-            const obj = {};
-            obj[parsed.key] = parsed.value;
-            return { obj: obj, nextIndex: startIndex + 1 };
-        }
-        
-        if (parsed.type === 'object') {
-            // Check what comes next
-            let i = startIndex + 1;
-            const children = [];
-            let childObj = {};
+        while (i < lines.length) {
+            const parsed = parseLine(lines[i]);
             
-            while (i < lines.length) {
-                const nextLine = lines[i];
-                const nextIndent = getIndentLevel(nextLine);
+            if (parsed.type === 'keyvalue') {
+                root[parsed.key] = parseValue(parsed.value);
+                i++;
+            } else if (parsed.type === 'object') {
+                i++;
+                const obj = {};
                 
-                if (nextIndent <= currentIndent) {
-                    break;
-                }
-                
-                if (nextIndent === currentIndent + 1) {
-                    const nextParsed = parseLine(nextLine);
+                while (i < lines.length) {
+                    const next = parseLine(lines[i]);
                     
-                    if (nextParsed.type === 'bullet') {
-                        // It's an array
-                        children.push(parseValue(nextParsed.value));
-                        i++;
-                    } else if (nextParsed.type === 'keyvalue') {
-                        // Object property
-                        childObj[nextParsed.key] = nextParsed.value;
+                    if (next.type === 'object' || next.type === 'array' || next.type === 'array-schema') {
+                        // Nested object or array
+                        const nested = buildStructure();
+                        Object.assign(obj, nested);
+                        break;
+                    } else if (next.type === 'keyvalue') {
+                        obj[next.key] = parseValue(next.value);
                         i++;
                     } else {
-                        // Nested object
-                        const result = buildObject(lines, i, currentIndent);
-                        Object.assign(childObj, result.obj);
-                        i = result.nextIndex;
+                        break;
                     }
-                } else {
+                }
+                
+                root[parsed.key] = obj;
+            } else if (parsed.type === 'array-schema') {
+                i++;
+                const arr = [];
+                
+                for (let j = 0; j < parsed.count; j++) {
+                    if (i >= lines.length) break;
+                    const line = lines[i].trim();
+                    const values = line.split(parsed.fields.length > 1 ? '|' : ',');
+                    const item = {};
+                    
+                    parsed.fields.forEach((field, idx) => {
+                        if (idx < values.length) {
+                            item[field.trim()] = parseValue(values[idx]);
+                        }
+                    });
+                    
+                    arr.push(item);
                     i++;
                 }
-            }
-            
-            const obj = {};
-            if (children.length > 0) {
-                obj[parsed.key] = children;
-            } else if (Object.keys(childObj).length > 0) {
-                obj[parsed.key] = childObj;
+                
+                root[parsed.key] = arr;
+            } else if (parsed.type === 'array') {
+                i++;
+                const arr = [];
+                
+                while (i < lines.length) {
+                    const next = parseLine(lines[i]);
+                    
+                    if (next.type === 'array-item') {
+                        arr.push(parseValue(next.value));
+                        i++;
+                    } else if (next.type === 'array-item-kv') {
+                        const obj = {};
+                        obj[next.key] = parseValue(next.value);
+                        
+                        // Check for more properties of this object
+                        i++;
+                        while (i < lines.length) {
+                            const nextKV = parseLine(lines[i]);
+                            if (nextKV.type === 'keyvalue') {
+                                obj[nextKV.key] = parseValue(nextKV.value);
+                                i++;
+                            } else {
+                                break;
+                            }
+                        }
+                        
+                        arr.push(obj);
+                    } else {
+                        break;
+                    }
+                }
+                
+                root[parsed.key] = arr;
             } else {
-                obj[parsed.key] = {};
+                i++;
             }
-            
-            return { obj: obj, nextIndex: i };
         }
         
-        return { obj: {}, nextIndex: startIndex + 1 };
+        return root;
     }
     
-    // Build the entire structure
-    let result = {};
-    let index = 0;
-    
-    while (index < lines.length) {
-        const buildResult = buildObject(lines, index, -1);
-        Object.assign(result, buildResult.obj);
-        index = buildResult.nextIndex;
-        
-        if (index === buildResult.nextIndex) {
-            index++;
-        }
-    }
-    
-    // If there's only one root key, unwrap it
-    const keys = Object.keys(result);
-    if (keys.length === 1) {
-        return result;
-    }
-    
-    return result;
+    return buildStructure();
 }
 
 // Validate Toon
