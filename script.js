@@ -62,27 +62,14 @@ function setupEventListeners() {
         });
     });
     
-    // Dropdown items
-    document.querySelectorAll('.dropdown-item').forEach(item => {
-        item.addEventListener('click', (e) => {
-            const caseType = e.currentTarget.dataset.case;
+    // Change case buttons
+    const caseButtons = document.querySelectorAll('.case-btn');
+    caseButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            caseButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const caseType = btn.dataset.case;
             if (caseType) changeCasing(caseType);
-        });
-    });
-    
-    // Dropdown toggle
-    document.querySelectorAll('.dropdown-toggle').forEach(toggle => {
-        toggle.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const menu = toggle.nextElementSibling;
-            menu.classList.toggle('show');
-        });
-    });
-    
-    // Close dropdowns
-    document.addEventListener('click', () => {
-        document.querySelectorAll('.dropdown-menu').forEach(menu => {
-            menu.classList.remove('show');
         });
     });
     

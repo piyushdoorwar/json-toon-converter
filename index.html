@@ -59,22 +59,6 @@
                                 <line x1="18" y1="6" x2="18" y2="18"/>
                             </svg>
                         </button>
-                        <div class="dropdown json-only">
-                            <button class="action-btn dropdown-toggle" data-action="change-case" aria-label="Change case" data-tooltip="Change case">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M4 7V4h16v3"/>
-                                    <path d="M9 20h6"/>
-                                    <path d="M12 4v16"/>
-                                </svg>
-                                <span class="dropdown-arrow">▼</span>
-                            </button>
-                            <div class="dropdown-menu">
-                                <button class="dropdown-item" data-case="camel">camelCase</button>
-                                <button class="dropdown-item" data-case="snake">snake_case</button>
-                                <button class="dropdown-item" data-case="pascal">PascalCase</button>
-                                <button class="dropdown-item" data-case="kebab">kebab-case</button>
-                            </div>
-                        </div>
                         <button class="action-btn" data-action="copy-left" aria-label="Copy" data-tooltip="Copy">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
@@ -228,6 +212,15 @@
                         <button class="delimiter-btn active" data-delimiter=",">,</button>
                         <button class="delimiter-btn" data-delimiter="\t">\t</button>
                         <button class="delimiter-btn" data-delimiter="|">|</button>
+                    </div>
+                </div>
+                <div class="settings-option json-only">
+                    <label class="settings-label">Change Case</label>
+                    <div class="case-buttons">
+                        <button class="case-btn" data-case="camel">camelCase</button>
+                        <button class="case-btn" data-case="snake">snake_case</button>
+                        <button class="case-btn" data-case="pascal">PascalCase</button>
+                        <button class="case-btn" data-case="kebab">kebab-case</button>
                     </div>
                 </div>
             </div>
